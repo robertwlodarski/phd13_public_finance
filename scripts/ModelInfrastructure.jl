@@ -16,7 +16,8 @@
 
     # B. Lifecycle parameters 
     T::Int              = 40            # Years in the labour market 
-    c̲::Float64          = 1e-4          # Consumption floor 
+    c̲::Float64          = 1e-4          # Consumption floor
+    S::Int              = 10000         # Number of simulated workers  
 
     # C. Income grid 
     ρ::Float64          = 0.98          # Persistence
@@ -67,13 +68,18 @@ UsedParameters = fnSetUpParameters()
     𝐀::Array{Float64,3}     # Savings policy function 
     𝐂::Array{Float64,3}     # Consumption policy function 
     𝐍::Array{Bool,3}        # Labour supply policy
+
+    # B. Distributions 
+    Φ::Array{Float64,3}     # Wealth distribution by income and age
+    𝔼ʸΦ::Matrix{Float64}    # Wealth distribution by age
+    Φ₁::Matix{Float64}      # Time 1's assumed distribution
 end
 
 # 2. Endogenous variables preallocation (constructor)
 function fnSetUpEndo(params::ModelParameters)
 
     # A. Unpacking business 
-    @unpack T, Nʸ, Nᵃ = params 
+    @unpack T, Nʸ, Nᵃ,ν⃗ = params 
 
     # B. Preallocate values: Values and policies 
     𝐕       = zeros(T, Nʸ, Nᵃ)
@@ -84,6 +90,12 @@ function fnSetUpEndo(params::ModelParameters)
     𝐂       = zeros(T, Nʸ, Nᵃ)
     𝐍       = fill(true, T, Nʸ, Nᵃ)
 
+  # C. Distributions 
+    Φ          = zeros(T, Nʸ, Nᵃ)
+    Φ[1, :, 1] .= ν⃗                  
+    𝔼ʸΦ        = zeros(T, Nᵃ)
+    𝔼ʸΦ[1, 1]  = 1.0                 
+
     # D. Return 
     return EndogenousVariables(
         𝐕   = 𝐕,
@@ -92,7 +104,10 @@ function fnSetUpEndo(params::ModelParameters)
         𝔼∂𝐕 = 𝔼∂𝐕,
         𝐀   = 𝐀,
         𝐂   = 𝐂,
-        𝐍   = 𝐍
+        𝐍   = 𝐍,
+        Φ₁  = Φ₁,
+        Φ   = Φ,
+        𝔼ʸΦ = 𝔼ʸΦ
     )   
 end 
 EndoInelasticLab    = fnSetUpEndo(UsedParameters) # Structure for model with ileastic labour supply 
