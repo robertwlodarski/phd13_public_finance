@@ -8,6 +8,7 @@
 
 ## 1. Packages & load functions 
 using Parameters, QuantEcon, LinearAlgebra, Roots, Printf, Plots, Distributions, StatsBase, Random, Dierckx 
+using Statistics, Plots
 include("scripts/ModelInfrastructure.jl")
 include("scripts/Functions.jl")
 
@@ -16,3 +17,10 @@ include("scripts/Functions.jl")
 @time fnMonteCarlo!(UsedParameters, EndoInelasticLab; end_labour = false)
 @time fnNonStochasticSimulation!(UsedParameters,EndoMain;end_labour=true)
 @time fnMonteCarlo!(UsedParameters, EndoMain; end_labour = true)
+
+## 3. Comparing two methods of calculating key moments 
+include("analysis/ComparingSimulations.jl")
+
+## 4. Simulation and estimation
+
+## 5. Real vs. model data statistics
