@@ -6,17 +6,17 @@
 @with_kw struct ModelParameters
 
     # A. Parameters 
-    γ::Float64          = 4.0           # Consumption utility parameter 
-    χ::Float64          = 0.5           # Disutility of labour shifter
-    σ::Float64          = 4.0           # Labour utility parameter 
-    β::Float64          = 0.98          # Discount factor
+    γ::Float64          = 2.0           # Consumption utility parameter 
+    χ::Float64          = 2.0           # Disutility of labour shifter
+    σ::Float64          = 0.5           # Labour utility parameter 
+    β::Float64          = 0.99          # Discount factor
     L::Float64          = 1.0           # Leisure endowment (normalised to 1)
-    h::Float64          = 8.0/24.0      # Hours if working 
+    h::Float64          = 1.0/3.0       # Hours if working 
     r::Float64          = 1/β - 1       # Interest rate
 
     # B. Lifecycle parameters 
     T::Int              = 40            # Years in the labour market 
-    c̲::Float64          = 1e-4          # Consumption floor
+    c̲::Float64          = 1e-8          # Consumption floor
     S::Int              = 10000         # Number of simulated workers  
     sʳⁿᵍ::Int           = 1997          # Ensuring reproducibility 
 
