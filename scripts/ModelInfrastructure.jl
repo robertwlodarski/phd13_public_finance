@@ -18,6 +18,7 @@
     T::Int              = 40            # Years in the labour market 
     c̲::Float64          = 1e-4          # Consumption floor
     S::Int              = 10000         # Number of simulated workers  
+    sʳⁿᵍ::Int           = 1997          # Ensuring reproducibility 
 
     # C. Income grid 
     ρ::Float64          = 0.98          # Persistence
@@ -72,14 +73,20 @@ UsedParameters = fnSetUpParameters()
     # B. Distributions 
     Φ::Array{Float64,3}     # Wealth distribution by income and age
     𝔼ʸΦ::Matrix{Float64}    # Wealth distribution by age
-    Φ₁::Matix{Float64}      # Time 1's assumed distribution
+
+    # C. Simulated values 
+    Â::Matrix{Float64}      # Simulated asset holdings 
+    Ŷ::Matrix{Float64}      # Simulated income     
+    Ĉ::Matrix{Float64}      # Simulated consumption 
+    N̂::Matrix{Bool}         # Simulated labour supply 
+
 end
 
 # 2. Endogenous variables preallocation (constructor)
 function fnSetUpEndo(params::ModelParameters)
 
     # A. Unpacking business 
-    @unpack T, Nʸ, Nᵃ,ν⃗ = params 
+    @unpack T, Nʸ, Nᵃ,ν⃗,S,a⃗ = params 
 
     # B. Preallocate values: Values and policies 
     𝐕       = zeros(T, Nʸ, Nᵃ)
@@ -90,13 +97,20 @@ function fnSetUpEndo(params::ModelParameters)
     𝐂       = zeros(T, Nʸ, Nᵃ)
     𝐍       = fill(true, T, Nʸ, Nᵃ)
 
-  # C. Distributions 
-    Φ          = zeros(T, Nʸ, Nᵃ)
-    Φ[1, :, 1] .= ν⃗                  
-    𝔼ʸΦ        = zeros(T, Nᵃ)
-    𝔼ʸΦ[1, 1]  = 1.0                 
+    # C. Distributions 
+    Φ           = zeros(T, Nʸ, Nᵃ)
+    Φ[1, :, 1]  .= ν⃗                  
+    𝔼ʸΦ         = zeros(T, Nᵃ)
+    𝔼ʸΦ[1, 1]   = 1.0
+    
+    # D. Simulated objects
+    Â           = zeros(T,S)
+    Â[1,:]      .= a⃗[1]
+    Ŷ           = zeros(T,S)
+    Ĉ           = zeros(T,S)
+    N̂           = fill(true, T, S)
 
-    # D. Return 
+    # E. Return 
     return EndogenousVariables(
         𝐕   = 𝐕,
         𝔼𝐕  = 𝔼𝐕,
@@ -105,9 +119,12 @@ function fnSetUpEndo(params::ModelParameters)
         𝐀   = 𝐀,
         𝐂   = 𝐂,
         𝐍   = 𝐍,
-        Φ₁  = Φ₁,
         Φ   = Φ,
-        𝔼ʸΦ = 𝔼ʸΦ
+        𝔼ʸΦ = 𝔼ʸΦ,
+        Â   = Â,
+        Ŷ   = Ŷ,
+        Ĉ   = Ĉ,
+        N̂   = N̂
     )   
 end 
 EndoInelasticLab    = fnSetUpEndo(UsedParameters) # Structure for model with ileastic labour supply 

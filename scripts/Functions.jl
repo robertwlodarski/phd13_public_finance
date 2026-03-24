@@ -3,7 +3,8 @@
 # 2. Last period's policies 
 # 3. Residual function 
 # 4. Backward loop induction
-# 5. Run the model 
+# 5. Non-stochastic simulation 
+# 6. Stochastic simulation
 
 # 1. Last period's utilities 
 function fnUtilityLast(params)
@@ -12,10 +13,10 @@ function fnUtilityLast(params)
     @unpack γ, χ, σ, a⃗, y⃗, L, h, c̲ = params 
 
     # B. Working utility 
-    𝐕ʷ              = ((max.(a⃗' .+ y⃗,c̲)).^(1-γ) - 1) ./ (1-γ) .- χ * ((L - h)^(1 - σ) - 1)/(1 - σ)
+    𝐕ʷ              = ((max.(a⃗' .+ y⃗,c̲)).^(1-γ) .- 1) ./ (1-γ) .- χ * ((L - h)^(1 - σ) - 1)/(1 - σ)
     
     # C. Non-working utility 
-    𝐕ⁿʷ             = ((max.(a⃗,c̲)).^(1-γ) - 1) ./ (1-γ)
+    𝐕ⁿʷ             = ((max.(a⃗',c̲)).^(1-γ) .- 1) ./ (1-γ)
     
     return 𝐕ʷ, 𝐕ⁿʷ
 end 
@@ -39,49 +40,61 @@ function fnLastPeriod!(params, endo; end_labour = end_labour)
     # B. Choose consumption and savings 
     # Given that V(T+1)= 0 ∀ Aₜ₊₁, agents consume everything.
     # Cₜ=Aₜ+Yₜ for t = T
-    endo.𝐂[T,:,:]       .= a⃗ .+ (y⃗ .* endo.𝐍[T,:,:])'
-    endo.𝐀[T,:,:]       .= zeros(Nᵃ, Nʸ)
+    endo.𝐂[T,:,:]       .= a⃗' .+ (y⃗ .* endo.𝐍[T,:,:])
+    endo.𝐀[T,:,:]       .= zeros(Nʸ,Nᵃ)
 
 end 
 
 # 3. Find assets
-function fnFindAssets(iy, ia,it,RHS_spline, params, endo)
+function fnFindAssets(iy, ia, it, RHS_spline, params, endo)
 
     # A. Unpack parameters 
-    @unpack a⃗,y⃗,γ,r, c̲, β, a̲= params
+    @unpack a⃗, y⃗, γ, r, c̲, β, a̲ = params
 
-    # B. Check the lower bound constraint (working)
-    Lower   = a̲ 
-    Upper   = (1+r) * (a⃗[ia] + y⃗[iy] - c̲)
-    Res_L   = (a⃗[ia] + y⃗[iy] - Lower/(1+r))^(-γ) - β * (1+r) * endo.𝔼∂𝐕[it, iy, 1]
-    Constr  = (Res_L >= 0)
-
-    # C. Spline the strictly positive RHS (working)
-    if Constr == false 
-        A_w     = find_zero(a -> (a⃗[ia] + y⃗[iy] - a/(1+r))^(-γ) - β * (1+r) * RHS_spline(a), (Lower, Upper), Bisection())
-    else 
-        A_w     = Lower
+    # B. Helper function: The Euler residual 
+    function Res(a_next, cash)
+        return (cash - a_next/(1+r))^(-γ) - β * (1+r) * RHS_spline(a_next)
     end
 
-    # D. Check the lower bound constraint (working)
-    Cash_nw     = a⃗[ia]
-    if Cash_nw <=  c̲ + a̲ / (1 + r)
-        A_nw    = a̲
+    # C. Working state
+    Cash_w = a⃗[ia] + y⃗[iy]
+    if Cash_w <= c̲ + a̲ / (1+r)
+        A_w = a̲
     else
-        Lower_n     = a̲ 
-        Upper_n     = (1+r) * (a⃗[ia] - c̲)
-        Res_Ln      = (a⃗[ia] - Lower_n/(1+r))^(-γ) - β * (1+r) * endo.𝔼∂𝐕[it, iy, 1]
-        Constr_n    = (Res_Ln >= 0)
-
-        # E. Spline the strictly positive RHS (working)
-        if Constr_n == false 
-            A_nw    = find_zero(a -> (a⃗[ia] - a/(1+r))^(-γ) - β * (1+r) * RHS_spline(a), (Lower_n, Upper_n), Bisection())
+        Lower_w = a̲ 
+        Upper_w = (1+r) * (Cash_w - c̲)
+        
+        # Explicitly check both bounds to prevent Bisection crashes
+        if Res(Lower_w, Cash_w) >= 0.0
+            A_w = Lower_w
+        elseif Res(Upper_w, Cash_w) <= 0.0
+            A_w = Upper_w
         else 
-            A_nw    = Lower_n
+            A_w = find_zero(a -> Res(a, Cash_w), (Lower_w, Upper_w), Bisection())
+        end
+    end
+
+    # D. --- NON-WORKING STATE ---
+    Cash_nw = a⃗[ia]
+    if Cash_nw <= c̲ + a̲ / (1+r)
+        # Starvation trap prevention
+        A_nw = a̲
+    else
+        Lower_n = a̲ 
+        Upper_n = (1+r) * (Cash_nw - c̲)
+        
+        # Explicitly check both bounds to prevent Bisection crashes
+        if Res(Lower_n, Cash_nw) >= 0.0
+            A_nw = Lower_n
+        elseif Res(Upper_n, Cash_nw) <= 0.0
+            A_nw = Upper_n
+        else 
+            A_nw = find_zero(a -> Res(a, Cash_nw), (Lower_n, Upper_n), Bisection())
         end 
     end 
+
     return A_w, A_nw
-end 
+end
 
 # Backward loop induction 
 
@@ -91,7 +104,7 @@ function fnBackwardInduction!(params, endo; end_labour = end_labour)
     @unpack T,a̲,a⃗,Γ,γ,Nʸ,Nᵃ,y⃗,r,χ,σ,L,h,β = params
 
     # B. Get last period's policies 
-    fnLastPeriod!(params, endo; end_labour = true)
+    fnLastPeriod!(params, endo; end_labour = end_labour)
 
     # C. Start the loop 
     for it in T-1:(-1):1
@@ -171,3 +184,70 @@ function fnNonStochasticSimulation!(params,endo; end_labour = true)
         end
     end 
 end 
+
+# 6. Stochastic simulation
+function fnMonteCarlo!(params, endo; end_labour = true)
+
+    # A. Unpacking business 
+    @unpack T, y⃗,a⃗,Γ, S,sʳⁿᵍ,ν⃗ = params 
+
+    # B. Sampling indices for the initial income process 
+    rng             = Xoshiro(sʳⁿᵍ)
+    Yᵢ              = zeros(Int, T,S)
+    Yᵢ[1,:]         = sample(rng, 1:length(y⃗), Weights(ν⃗),S)
+
+    # C. Start the life-cycle loop
+    for it in 1:T-1
+        
+        # I. Build splines for policy functions 
+        SplineA     = [Spline1D(a⃗, @views(endo.𝐀[it,iy,:]); k=1, bc = "extrapolate") for iy in eachindex(y⃗)]
+        SplineC     = [Spline1D(a⃗, @views(endo.𝐂[it,iy,:]); k=1, bc = "extrapolate") for iy in eachindex(y⃗)]
+        if end_labour == true 
+            SplineN = [Spline1D(a⃗, Float64.(@views(endo.𝐍[it,iy,:])); k=1, bc = "extrapolate") for iy in eachindex(y⃗)]
+        end 
+
+        # II. Loop for all S agents 
+        for is in 1:S
+            
+            # IIA. Values 
+            iy              = Yᵢ[it,is]
+            a               = endo.Â[it,is]
+
+            # IIB. Continuous choices 
+            endo.Â[it+1,is] = SplineA[iy](a)
+            endo.Ĉ[it,is]   = SplineC[iy](a)
+            endo.Ŷ[it,is]   = y⃗[iy]
+
+            # IIC. Discrete choices 
+            if end_labour == true
+                UsedSpline      = clamp(SplineN[iy](a),0.0,1.0)
+                endo.N̂[it,is]   = round(Bool,UsedSpline)
+            end 
+
+            # IID. Tomorrow's income shock 
+            Yᵢ[it+1,is]         = sample(rng, 1:length(y⃗), Weights(@views(Γ[iy,:])))
+        end 
+    end
+
+    # D. Last period 
+    if end_labour == true 
+            SplineN = [Spline1D(a⃗, Float64.(@views(endo.𝐍[T,iy,:])); k=1, bc = "extrapolate") for iy in eachindex(y⃗)]
+        end 
+    for is in 1:S 
+
+        # I. Assets and income shock index 
+        a       = endo.Â[T,is]
+        iy      = Yᵢ[T,is]
+
+        # II. Discrete choices 
+        if end_labour == true
+            UsedSpline      = clamp(SplineN[iy](a),0.0,1.0)
+            endo.N̂[T,is]   = round(Bool,UsedSpline)
+        end  
+
+        # III. Eat everything in the last period
+        endo.Ĉ[T,is]    = a + endo.N̂[T,is] * y⃗[iy]
+        endo.Ŷ[T,is]    = y⃗[iy]
+    end 
+end 
+
