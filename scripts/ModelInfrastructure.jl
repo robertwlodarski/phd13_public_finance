@@ -21,9 +21,9 @@
     sʳⁿᵍ::Int           = 1997          # Ensuring reproducibility 
 
     # C. Income grid 
-    ρ::Float64          = 0.98          # Persistence
-    σʸ::Float64         = sqrt(0.0289)  # Shock standard deviation 
-    Nʸ::Int             = 20            # Income grid size 
+    ρ::Float64          = 0.75          # Persistence
+    σʸ::Float64         = sqrt(0.25)    # Shock standard deviation 
+    Nʸ::Int             = 40            # Income grid size 
     y⃗::Vector{Float64}  = zeros(Nʸ)     # Income grid 
     Γ::Matrix{Float64}  = zeros(Nʸ,Nʸ)  # Income transition PDF
     ν⃗::Vector{Float64}  = zeros(Nʸ)     # Stationary distribution of income
@@ -34,6 +34,11 @@
     a̲::Float64          = 0.0           # Minimum assets 
     a̅::Float64          = 80.0          # Maximum assets
     θᵃ::Float64         = 3.0           # Curvature of the assets grid 
+
+    # E. Synthetic sample settings 
+    σ̃ᵃ::Float64         = 0.5           # Assets (levels)
+    σ̃ʸ::Float64         = 0.1           # Income (logs)
+    σ̃ᶜ::Float64         = 0.1           # Consumption (logs)
 end 
 
 # 2. Parameters (constructor)
