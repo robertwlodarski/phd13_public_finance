@@ -2,7 +2,7 @@
 
 This repository translates the original Matlab code from the PHD13 Public Finance course into Julia. Taking advantage of Julia's performance and multiple dispatch, this codebase also extends the original dynamic programming framework to include a **binary labor supply decision**.
 
-## Font installation (Highly recommended)
+## Font installation
 
 This project uses Unicode characters and mathematical symbols to make the Julia code as readable and closely aligned to the formal notation as possible. 
 
@@ -10,6 +10,18 @@ To ensure these special characters render correctly in your IDE or terminal, ple
 
 * **Download and instructions:** [JuliaMono GitHub Repository](https://github.com/cormullion/juliamono)
 * **Setup:** Once downloaded, install the font files to your system and update your code editor's font family settings to `JuliaMono`.
+
+## Notation 
+
+I rely on the Unicode characters to make the Julia code as closely aligned to the formal notation as possible. 
+In so doing, I follow the convention below in defining the modelled objects.
+
+1. Roman alphabet: Generic objects
+2. Greek letters: Parameters
+3. Symbols with arrows: Vectors
+4. Bold symbols: Value and policy functions
+5. Typeset symbols: Measures
+
 
 ## Getting started
 
