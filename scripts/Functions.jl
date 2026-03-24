@@ -13,7 +13,7 @@ function fnUtilityLast(params)
     @unpack γ, χ, σ, a⃗, y⃗, L, h, c̲ = params 
 
     # B. Working utility 
-    𝐕ʷ              = ((max.(a⃗' .+ y⃗,c̲)).^(1-γ) .- 1) ./ (1-γ) .- χ * ((L - h)^(1 - σ) - 1)/(1 - σ)
+    𝐕ʷ              = ((max.(a⃗' .+ y⃗,c̲)).^(1-γ) .- 1) ./ (1-γ) .+ χ * ((L - h)^(1 - σ) - 1)/(1 - σ)
     
     # C. Non-working utility 
     𝐕ⁿʷ             = ((max.(a⃗',c̲)).^(1-γ) .- 1) ./ (1-γ)
@@ -25,7 +25,7 @@ end
 function fnLastPeriod!(params, endo; end_labour = end_labour)
 
     # A. Unpacking business 
-    @unpack T, a⃗, y⃗, Nᵃ, Nʸ, Γ, γ = params
+    @unpack T, a⃗, y⃗, Nᵃ, Nʸ, Γ, γ,c̲ = params
 
     # B. Compute values with and without working 
     𝐕ʷ, 𝐕ⁿʷ                 = fnUtilityLast(params)
@@ -40,7 +40,7 @@ function fnLastPeriod!(params, endo; end_labour = end_labour)
     # B. Choose consumption and savings 
     # Given that V(T+1)= 0 ∀ Aₜ₊₁, agents consume everything.
     # Cₜ=Aₜ+Yₜ for t = T
-    endo.𝐂[T,:,:]       .= a⃗' .+ (y⃗ .* endo.𝐍[T,:,:])
+    endo.𝐂[T,:,:]       .= max.(a⃗' .+ (y⃗ .* endo.𝐍[T,:,:]),c̲)
     endo.𝐀[T,:,:]       .= zeros(Nʸ,Nᵃ)
 
 end 
@@ -96,12 +96,11 @@ function fnFindAssets(iy, ia, it, RHS_spline, params, endo)
     return A_w, A_nw
 end
 
-# Backward loop induction 
-
+# 4. Backward loop induction 
 function fnBackwardInduction!(params, endo; end_labour = end_labour)
 
     # A. Unpacking business 
-    @unpack T,a̲,a⃗,Γ,γ,Nʸ,Nᵃ,y⃗,r,χ,σ,L,h,β = params
+    @unpack T,a̲,a⃗,Γ,γ,Nʸ,Nᵃ,y⃗,r,χ,σ,L,h,β,ν⃗,c̲ = params
 
     # B. Get last period's policies 
     fnLastPeriod!(params, endo; end_labour = end_labour)
@@ -124,24 +123,24 @@ function fnBackwardInduction!(params, endo; end_labour = end_labour)
                     Aʷ, Aⁿʷ             = fnFindAssets(iy, ia,it,ℑᶠ, params, endo)
 
                     # III. Consumption policies
-                    Cʷ                  = y⃗[iy] + a⃗[ia] - Aʷ/(1+r)
-                    Cⁿʷ                 = a⃗[ia] - Aⁿʷ/(1+r)
+                    Cʷ                  = max(y⃗[iy] + a⃗[ia] - Aʷ/(1+r),c̲)
+                    Cⁿʷ                 = max(a⃗[ia] - Aⁿʷ/(1+r),c̲)
 
                     # IV. Value functions 
-                    Vʷ                  = ((Cʷ)^(1-γ)-1)/(1-γ) - χ * ((L-h)^(1-σ)-1)/(1-σ) + β * ℑᵛ(Aʷ)
+                    Vʷ                  = ((Cʷ)^(1-γ)-1)/(1-γ) + χ * ((L-h)^(1-σ)-1)/(1-σ) + β * ℑᵛ(Aʷ)
                     Vⁿʷ                 = ((Cⁿʷ)^(1-γ)-1)/(1-γ)+ β * ℑᵛ(Aⁿʷ)
 
                     # V. Policies 
                     endo.𝐍[it,iy,ia]    = (Vʷ >= Vⁿʷ)
                     endo.𝐕[it,iy,ia]    = Vⁿʷ + endo.𝐍[it,iy,ia]*(Vʷ - Vⁿʷ)
-                    endo.𝐂[it,iy,ia]    = Cⁿʷ + endo.𝐍[it,iy,ia]*(Cʷ - Cⁿʷ)
+                    endo.𝐂[it,iy,ia]    = max(Cⁿʷ + endo.𝐍[it,iy,ia]*(Cʷ - Cⁿʷ),c̲)
                     endo.𝐀[it,iy,ia]    = Aⁿʷ + endo.𝐍[it,iy,ia]*(Aʷ - Aⁿʷ)
                 
                 else 
                     # VI. Version without endogeus labour supply
                     A,_                 =  fnFindAssets(iy, ia,it,ℑᶠ, params, endo)
                     endo.𝐀[it,iy,ia]    = A
-                    endo.𝐂[it,iy,ia]    = y⃗[iy] + a⃗[ia] - A/(1+r)
+                    endo.𝐂[it,iy,ia]    = max(y⃗[iy] + a⃗[ia] - A/(1+r),c̲)
                     endo.𝐕[it,iy,ia]    = ((endo.𝐂[it,iy,ia])^(1-γ)-1)/(1-γ)+ β * ℑᵛ(endo.𝐀[it,iy,ia])
                 end 
             end 
@@ -153,11 +152,17 @@ end
 function fnNonStochasticSimulation!(params,endo; end_labour = true)
 
     # A. Unpacking business 
-    @unpack T,y⃗,a⃗,Γ = params 
+    @unpack T,y⃗,a⃗,Γ,ν⃗ = params 
     # B. Run the model 
     fnBackwardInduction!(params, endo; end_labour = end_labour)
 
-    # C. Start iterating 
+    # C. Initialize the first generation 
+    fill!(endo.Φ, 0.0)      
+    fill!(endo.𝔼ʸΦ, 0.0)    
+    endo.Φ[1, :, 1]     .= ν⃗   
+    endo.𝔼ʸΦ[1, 1]      = 1.0
+
+    # D. Start iterating 
     for it in 1:1:T-1 
         for iy in eachindex(y⃗)
             for ia in eachindex(a⃗)
@@ -189,7 +194,7 @@ end
 function fnMonteCarlo!(params, endo; end_labour = true)
 
     # A. Unpacking business 
-    @unpack T, y⃗,a⃗,Γ, S,sʳⁿᵍ,ν⃗ = params 
+    @unpack T, y⃗,a⃗,Γ, S,sʳⁿᵍ,ν⃗,c̲ = params 
 
     # B. Sampling indices for the initial income process 
     rng             = Xoshiro(sʳⁿᵍ)
@@ -215,7 +220,7 @@ function fnMonteCarlo!(params, endo; end_labour = true)
 
             # IIB. Continuous choices 
             endo.Â[it+1,is] = SplineA[iy](a)
-            endo.Ĉ[it,is]   = SplineC[iy](a)
+            endo.Ĉ[it,is]   = max(SplineC[iy](a),c̲)
             endo.Ŷ[it,is]   = y⃗[iy]
 
             # IIC. Discrete choices 
@@ -246,7 +251,7 @@ function fnMonteCarlo!(params, endo; end_labour = true)
         end  
 
         # III. Eat everything in the last period
-        endo.Ĉ[T,is]    = a + endo.N̂[T,is] * y⃗[iy]
+        endo.Ĉ[T,is]    = max(a + endo.N̂[T,is] * y⃗[iy],c̲)
         endo.Ŷ[T,is]    = y⃗[iy]
     end 
 end 
