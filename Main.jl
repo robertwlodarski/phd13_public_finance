@@ -9,7 +9,7 @@
 ## 1. Packages & load functions 
 using Parameters, QuantEcon, LinearAlgebra, Roots, Printf, Plots, Distributions, StatsBase, Random, Dierckx 
 using Statistics, Plots
-using DataFrames, Distributions, Random, GLM
+using DataFrames, Distributions, Random, GLM, Optim
 include("scripts/ModelInfrastructure.jl")
 include("scripts/Functions.jl")
 

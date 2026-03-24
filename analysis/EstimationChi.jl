@@ -93,6 +93,7 @@ plot!(p_fit, 1:est_params.T, est_moments,
     label = "Estimated (χ = $(round(estimated_chi, digits=2)))")
 annotate!(p_fit, 3, 0.35, text("True χ = $(round(UsedParameters.χ, digits=2))", :left, 10, :black))
 display(p_fit)
+savefig(p_fit, "plots/model_fit.pdf")
 
 # 4. Labour supply policies 
 policy_matrix_est   = Float64.(EndoMain.𝐍[20, :, :])
